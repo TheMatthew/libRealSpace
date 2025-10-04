@@ -29,6 +29,24 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install SDL2 (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libsdl2-dev
+
+    - name: Install SDL2 (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install sdl2
+
+    - name: Install SDL2 (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        vcpkg install sdl2:x64-windows
+        echo "CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $env:GITHUB_ENV
+
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
