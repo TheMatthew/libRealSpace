@@ -38,6 +38,15 @@ jobs:
         ${{github.workspace}}/vcpkg/bootstrap-vcpkg.sh -disableMetrics
         echo "VCPKG_ROOT=${{github.workspace}}/vcpkg" >> $GITHUB_ENV
 
+    - name: Install vcpkg dependencies (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        if [ "$(uname)" = "Darwin" ]; then
+          ${{github.workspace}}/vcpkg/vcpkg install --triplet=x64-osx
+        else
+          ${{github.workspace}}/vcpkg/vcpkg install --triplet=x64-linux
+        fi
+
     - name: Setup vcpkg (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
