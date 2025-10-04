@@ -42,23 +42,19 @@ jobs:
       run: |
         brew install sdl2 sdl2_ttf
 
+    - name: Setup vcpkg (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git ${{github.workspace}}/vcpkg
+        ${{github.workspace}}/vcpkg/bootstrap-vcpkg.sh
+        ${{github.workspace}}/vcpkg/vcpkg install imgui[sdl2-binding,sdl2-renderer-binding]
+
     - name: Install dependencies (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
         vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows imgui[sdl2-binding,sdl2-renderer-binding]:x64-windows
         echo "CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $env:GITHUB_ENV
-
-    - name: Install imgui (Linux/macOS)
-      if: runner.os != 'Windows'
-      run: |
-        git clone https://github.com/ocornut/imgui.git
-        cd imgui
-        sudo mkdir -p /usr/local/include/imgui
-        sudo cp *.h /usr/local/include/imgui/
-        sudo cp *.cpp /usr/local/include/imgui/
-        sudo cp backends/imgui_impl_sdl2.* /usr/local/include/imgui/
-        sudo cp backends/imgui_impl_sdlrenderer2.* /usr/local/include/imgui/
 
     - name: Build and Install SDL2_mixer_ext (Linux/macOS)
       if: runner.os != 'Windows'
