@@ -42,30 +42,23 @@ jobs:
       run: |
         brew install sdl2 sdl2_ttf
 
-    - name: Install SDL2 and imgui (Windows)
+    - name: Install dependencies (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows imgui[sdl2-binding]:x64-windows
+        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows imgui[sdl2-binding,sdl2-renderer-binding]:x64-windows
         echo "CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $env:GITHUB_ENV
 
-    - name: Install imgui (Linux)
-      if: runner.os == 'Linux'
+    - name: Install imgui (Linux/macOS)
+      if: runner.os != 'Windows'
       run: |
-        git clone https://github.com/ocornut/imgui.git /tmp/imgui
-        cd /tmp/imgui
-        mkdir build && cd build
-        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-        sudo cmake --install .
-
-    - name: Install imgui (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        git clone https://github.com/ocornut/imgui.git /tmp/imgui
-        cd /tmp/imgui
-        mkdir build && cd build
-        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-        sudo cmake --install .
+        git clone https://github.com/ocornut/imgui.git
+        cd imgui
+        sudo mkdir -p /usr/local/include/imgui
+        sudo cp *.h /usr/local/include/imgui/
+        sudo cp *.cpp /usr/local/include/imgui/
+        sudo cp backends/imgui_impl_sdl2.* /usr/local/include/imgui/
+        sudo cp backends/imgui_impl_sdlrenderer2.* /usr/local/include/imgui/
 
     - name: Build and Install SDL2_mixer_ext (Linux/macOS)
       if: runner.os != 'Windows'
@@ -102,29 +95,30 @@ jobs:
 
     - name: Package (Linux/macOS)
       if: runner.os != 'Windows'
-      working-directory: ${{github.workspace}}/build
       run: |
-        tar -czf ${{matrix.artifact_name}}.tar.gz *
+        BUILD_DIR=$(find ./out/build -type d -maxdepth 1 | grep -v "^\./out/build$" | head -n 1)
+        cd $BUILD_DIR
+        tar -czf ${{github.workspace}}/${{matrix.artifact_name}}.tar.gz *
 
     - name: Package (Windows)
       if: runner.os == 'Windows'
-      working-directory: ${{github.workspace}}/build
       shell: pwsh
       run: |
-        Compress-Archive -Path * -DestinationPath ${{matrix.artifact_name}}.zip
+        cd ./out/build/windows
+        Compress-Archive -Path * -DestinationPath ${{github.workspace}}/${{matrix.artifact_name}}.zip
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: ${{matrix.artifact_name}}
         path: |
-          ${{github.workspace}}/build/${{matrix.artifact_name}}.${{matrix.archive_extension}}
+          ${{github.workspace}}/${{matrix.artifact_name}}.${{matrix.archive_extension}}
 
     - name: Upload Release Assets
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: |
-          ${{github.workspace}}/build/${{matrix.artifact_name}}.${{matrix.archive_extension}}
+          ${{github.workspace}}/${{matrix.artifact_name}}.${{matrix.archive_extension}}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
