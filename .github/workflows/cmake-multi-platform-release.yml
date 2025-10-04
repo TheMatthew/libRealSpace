@@ -1,6 +1,8 @@
 name: CMake Multi-Platform Release Build
 
 on:
+  pull_request:
+    branches: [ "master", "main" ]
   release:
     types: [created, published]
 
