@@ -42,12 +42,30 @@ jobs:
       run: |
         brew install sdl2 sdl2_ttf
 
-    - name: Install SDL2 (Windows)
+    - name: Install SDL2 and imgui (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows
+        vcpkg install sdl2:x64-windows sdl2-ttf:x64-windows imgui[sdl2-binding]:x64-windows
         echo "CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $env:GITHUB_ENV
+
+    - name: Install imgui (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        git clone https://github.com/ocornut/imgui.git /tmp/imgui
+        cd /tmp/imgui
+        mkdir build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+        sudo cmake --install .
+
+    - name: Install imgui (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        git clone https://github.com/ocornut/imgui.git /tmp/imgui
+        cd /tmp/imgui
+        mkdir build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+        sudo cmake --install .
 
     - name: Build and Install SDL2_mixer_ext (Linux/macOS)
       if: runner.os != 'Windows'
