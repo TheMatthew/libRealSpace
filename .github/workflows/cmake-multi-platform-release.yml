@@ -1,10 +1,10 @@
 name: CMake Multi-Platform Release Build
 
 on:
-  pull_request:
-    branches: [ "master", "main" ]
   release:
     types: [created, published]
+  pull_request:
+    branches: [ "master", "main" ]
 
 env:
   BUILD_TYPE: Release
@@ -48,6 +48,29 @@ jobs:
       run: |
         vcpkg install sdl2:x64-windows
         echo "CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $env:GITHUB_ENV
+
+    - name: Build and Install SDL2_mixer_ext (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        git clone https://github.com/WohlSoft/SDL-Mixer-X.git
+        cd SDL-Mixer-X
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
+        cmake --build . --config Release
+        sudo cmake --install .
+
+    - name: Build and Install SDL2_mixer_ext (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        git clone https://github.com/WohlSoft/SDL-Mixer-X.git
+        cd SDL-Mixer-X
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_INSTALL_PREFIX=C:/SDL2_mixer_ext
+        cmake --build . --config Release
+        cmake --install . --config Release
+        echo "CMAKE_PREFIX_PATH=C:/SDL2_mixer_ext" >> $env:GITHUB_ENV
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
