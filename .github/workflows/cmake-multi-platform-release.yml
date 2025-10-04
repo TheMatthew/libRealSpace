@@ -1,0 +1,116 @@
+name: CMake Multi-Platform Release Build
+
+on:
+  release:
+    types: [created, published]
+  pull_request:
+    branches: [ "master", "main" ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: linux-build
+            archive_extension: tar.gz
+          - os: windows-latest
+            artifact_name: windows-build
+            archive_extension: zip
+          - os: macos-latest
+            artifact_name: macos-build
+            archive_extension: tar.gz
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup vcpkg (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git ${{github.workspace}}/vcpkg
+        ${{github.workspace}}/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+        echo "VCPKG_ROOT=${{github.workspace}}/vcpkg" >> $GITHUB_ENV
+
+    - name: Install additional build dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config autoconf automake libtool gettext gperf bison flex autopoint
+
+    - name: Install additional build dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install autoconf automake libtool gettext pkg-config
+
+    - name: Install vcpkg dependencies (Linux/macOS)
+      if: runner.os != 'Windows'
+      continue-on-error: false
+      run: |
+        if [ "$(uname)" = "Darwin" ]; then
+          ${{github.workspace}}/vcpkg/vcpkg install --triplet=x64-osx --recurse 2>&1 | tee vcpkg-install.log
+        else
+          ${{github.workspace}}/vcpkg/vcpkg install --triplet=x64-linux --recurse 2>&1 | tee vcpkg-install.log
+        fi
+        
+    - name: Check vcpkg installation
+      if: runner.os != 'Windows'
+      run: |
+        echo "=== Checking vcpkg installation ==="
+        if [ "$(uname)" = "Darwin" ]; then
+          ls -la ${{github.workspace}}/vcpkg/installed/x64-osx/ || echo "x64-osx directory not found"
+        else
+          ls -la ${{github.workspace}}/vcpkg/installed/x64-linux/ || echo "x64-linux directory not found"
+        fi
+
+    - name: Setup vcpkg (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        echo "VCPKG_ROOT=C:/vcpkg" >> $env:GITHUB_ENV
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
+
+    - name: Package (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        BUILD_DIR=$(find ./out/build -type d -maxdepth 1 | grep -v "^\./out/build$" | head -n 1)
+        cd $BUILD_DIR
+        tar -czf ${{github.workspace}}/${{matrix.artifact_name}}.tar.gz *
+
+    - name: Package (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        cd ./out/build/windows
+        Compress-Archive -Path * -DestinationPath ${{github.workspace}}/${{matrix.artifact_name}}.zip
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{matrix.artifact_name}}
+        path: |
+          ${{github.workspace}}/${{matrix.artifact_name}}.${{matrix.archive_extension}}
+
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          ${{github.workspace}}/${{matrix.artifact_name}}.${{matrix.archive_extension}}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
